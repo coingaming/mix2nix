@@ -1,12 +1,15 @@
 { sources ? import ./nix/sources.nix
 , pkgs ? import sources.nixpkgs { }
+, newpkgs ? import sources.nixpkgs-master { }
 }:
 
+with pkgs;
 pkgs.mkShell {
   buildInputs = [
-    pkgs.elixir
-
-    # keep this line if you use bash
-    pkgs.bashInteractive
+    elixir
+    newpkgs.gleam
+    (import ./nix/mix_gleam.nix {})
+    inotify-tools
+    bashInteractive
   ];
 }
