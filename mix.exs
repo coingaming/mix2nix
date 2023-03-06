@@ -37,6 +37,8 @@ defmodule Mix2nix.MixProject do
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:gleam_stdlib, "~> 0.27.0"},
       {:gleam_erlang, "~> 0.18.1"},
+      {:gleam_http, "~> 3.1"},
+      {:gleam_hackney, "~> 1.0"},
       {:glint, "~> 0.11.0"}
     ]
   end
