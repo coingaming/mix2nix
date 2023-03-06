@@ -119,12 +119,7 @@ fn tar(input: CommandInput) -> Result(Nil, String) {
   |> hc_update_config(RepoPublicKey, repo_public_key)
   |> hc_update_config(RepoUrl, repo_url)
   |> hc_update_config(RepoOrganization, repo_organization)
-  |> hc_update_config(
-    HttpAdapter,
-    #(Mix2nix, map.from_list([]))
-    |> dynamic.from
-    |> Some,
-  )
+  |> hc_update_config(HttpAdapter, Some(#(Mix2nix, map.from_list([]))))
   |> hc_get_tarball(pkg, vsn)
   |> string.inspect
   //
