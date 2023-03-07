@@ -2,6 +2,7 @@ import gleam/io
 import gleam/erlang/os
 import gleam/erlang
 import gleam/erlang/atom
+import gleam/erlang/file
 import gleam/result
 import gleam/bit_string
 import gleam/bit_builder
@@ -21,7 +22,7 @@ pub fn main(argv: List(String)) {
   glint.new()
   |> glint.add_command(
     at: ["tar"],
-    do: function.curry2(run_command)(tar),
+    do: function.curry2(run_command)(save_tar),
     with: [
       flag.string(unflag(Pkg), "", ""),
       flag.string(unflag(Vsn), "", ""),
@@ -55,6 +56,10 @@ fn run_command(
 
 type ThisModule {
   Mix2nix
+}
+
+type Tar {
+  Tar(untar: BitString)
 }
 
 type Flag {
@@ -98,14 +103,33 @@ fn req_arg(input: CommandInput, flag: Flag) -> Result(String, String) {
   }
 }
 
-fn tar(input: CommandInput) -> Result(Nil, String) {
-  use pkg <- result.then(req_arg(input, Pkg))
-  use vsn <- result.then(req_arg(input, Vsn))
-  use repo_key <- result.then(opt_arg(input, RepoKey))
-  use repo_name <- result.then(opt_arg(input, RepoName))
-  use repo_public_key <- result.then(opt_arg(input, RepoPublicKey))
-  use repo_url <- result.then(opt_arg(input, RepoUrl))
-  use repo_organization <- result.then(opt_arg(input, RepoOrganization))
+fn save_tar(inp inp: CommandInput) -> Result(Nil, String) {
+  use pkg <-
+    inp
+    |> req_arg(Pkg)
+    |> then
+  use vsn <-
+    inp
+    |> req_arg(Vsn)
+    |> then
+  use tar <-
+    get_tar(inp: inp, pkg: pkg, vsn: vsn)
+    |> then
+  tar.untar
+  |> file.write_bits(pkg <> "-" <> vsn <> ".tar")
+  |> result.map_error(string.inspect)
+}
+
+fn get_tar(
+  inp inp: CommandInput,
+  pkg pkg: String,
+  vsn vsn: String,
+) -> Result(Tar, String) {
+  use repo_key <- result.then(opt_arg(inp, RepoKey))
+  use repo_name <- result.then(opt_arg(inp, RepoName))
+  use repo_public_key <- result.then(opt_arg(inp, RepoPublicKey))
+  use repo_url <- result.then(opt_arg(inp, RepoUrl))
+  use repo_organization <- result.then(opt_arg(inp, RepoOrganization))
   //
   // TODO : !!!
   //
@@ -113,20 +137,32 @@ fn tar(input: CommandInput) -> Result(Nil, String) {
     "hackney"
     |> atom.create_from_string
     |> erlang.ensure_all_started
-  hc_default_config()
-  |> hc_update_config(RepoKey, repo_key)
-  |> hc_update_config(RepoName, repo_name)
-  |> hc_update_config(RepoPublicKey, repo_public_key)
-  |> hc_update_config(RepoUrl, repo_url)
-  |> hc_update_config(RepoOrganization, repo_organization)
-  |> hc_update_config(HttpAdapter, Some(#(Mix2nix, map.from_list([]))))
-  |> hc_get_tarball(pkg, vsn)
-  |> string.inspect
-  //
-  // TODO : !!!
-  //
-  |> io.println()
-  |> Ok
+  use res <-
+    hc_default_config()
+    |> hc_update_config(RepoKey, repo_key)
+    |> hc_update_config(RepoName, repo_name)
+    |> hc_update_config(RepoPublicKey, repo_public_key)
+    |> hc_update_config(RepoUrl, repo_url)
+    |> hc_update_config(RepoOrganization, repo_organization)
+    |> hc_update_config(HttpAdapter, Some(#(Mix2nix, map.from_list([]))))
+    |> hc_get_tarball(pkg, vsn)
+    |> result.map_error(string.inspect)
+    |> then
+  case res {
+    #(200, _, tar) ->
+      tar
+      |> Tar
+      |> Ok
+    _ ->
+      "Bad http status in " <> string.inspect(res)
+      |> Error
+  }
+  // |> string.inspect
+  // //
+  // // TODO : !!!
+  // //
+  // |> io.println()
+  // |> Ok
 }
 
 //  def request(mtd, uri, reqhrs, reqbody, _) do
